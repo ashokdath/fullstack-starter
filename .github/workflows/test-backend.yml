@@ -29,8 +29,10 @@ jobs:
       - run: docker compose down -v --remove-orphans
       - run: docker compose up -d --wait db mailpit
       - name: Run tests
-        run: uv run bash scripts/tests-start.sh "Coverage for ${{ github.sha }}"
+        run: uv run bash scripts/tests-start.sh
         working-directory: backend
+        env:
+          COVERAGE_TITLE: Coverage for ${{ github.sha }}
       - run: docker compose down -v --remove-orphans
       - name: Store coverage files
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
