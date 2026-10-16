@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.14, <4.0"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -78,7 +78,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "coverage", specifier = ">=7.4.3,<8.0.0" },
-    { name = "django-stubs", extras = ["compatible-mypy"], specifier = ">=5.2.0" },
+    { name = "django-stubs", extras = ["compatible-mypy"], specifier = ">=6.1.2" },
     { name = "mypy", specifier = ">=1.8.0,<3.0.0" },
     { name = "pytest", specifier = ">=7.4.3,<10.0.0" },
     { name = "pytest-django", specifier = ">=4.14.0,<5.0.0" },
