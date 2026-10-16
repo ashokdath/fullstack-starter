@@ -8,6 +8,15 @@ import {
 
 export type Theme = "dark" | "light" | "system"
 
+/**
+ * Inline script for the document <head>: applies the saved theme class before
+ * the first paint, so server-rendered pages don't flash the wrong theme.
+ * Keep the storage key and default in sync with the ThemeProvider props.
+ */
+export const themeScript = `(function(){try{var t=localStorage.getItem("vite-ui-theme")||"dark";if(t==="system")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.classList.add(t)}catch(e){}})()`
+
+const isBrowser = typeof window !== "undefined"
+
 type ThemeProviderProps = {
   children: React.ReactNode
   defaultTheme?: Theme
@@ -34,12 +43,15 @@ export function ThemeProvider({
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme,
+  const [theme, setTheme] = useState<Theme>(() =>
+    isBrowser
+      ? (localStorage.getItem(storageKey) as Theme) || defaultTheme
+      : defaultTheme,
   )
 
   const getResolvedTheme = useCallback((theme: Theme): "dark" | "light" => {
     if (theme === "system") {
+      if (!isBrowser) return "dark"
       return window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light"

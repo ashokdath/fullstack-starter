@@ -1,6 +1,33 @@
 # Django Project - Frontend
 
-The frontend is built with [Vite](https://vitejs.dev/), [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [TanStack Query](https://tanstack.com/query), [TanStack Router](https://tanstack.com/router), [Tailwind CSS](https://tailwindcss.com/), and [shadcn/ui](https://ui.shadcn.com/).
+The frontend is built with [TanStack Start](https://tanstack.com/start) (server-side rendering on top of [Vite](https://vitejs.dev/) and [TanStack Router](https://tanstack.com/router)), [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [TanStack Query](https://tanstack.com/query), [Tailwind CSS](https://tailwindcss.com/), and [shadcn/ui](https://ui.shadcn.com/).
+
+## Rendering: Public Pages and the App
+
+| Routes | Rendering | Why |
+|---|---|---|
+| `/` and other public pages | On the server (SSR) | Search engines and link previews get the full HTML and meta tags |
+| `/robots.txt`, `/sitemap.xml` | Server routes | SEO |
+| `/login`, `/signup`, password recovery, and the app under `_layout` (`/dashboard`, `/items`, `/admin`, `/settings`) | In the browser (`ssr: false`) | The access token is in `localStorage`, which only exists in the browser |
+
+### Adding an SEO Page
+
+1. Create a route file in `src/routes`, e.g. `pricing.tsx`. Routes render on the server by default.
+2. Set its title, description, Open Graph tags and canonical link in `head`, like `src/routes/index.tsx`.
+3. Add its path to `publicPaths` in `src/lib/site.ts` for the sitemap.
+4. To show API data, fetch it in the route's `loader`: during SSR it calls the API at `API_INTERNAL_URL`, without the user's token. Use public (anonymous) API endpoints only.
+
+Server-only code must not read browser APIs (`window`, `localStorage`, `document`) while rendering. Read them in effects or event handlers, or mark the route `ssr: false`.
+
+## Configuration
+
+| Variable | When | Purpose |
+|---|---|---|
+| `VITE_API_URL` | Build time | Only for an API on another domain. Default: the same origin (`/api`, routed to Django by the reverse proxy, or by the Vite dev server proxy in development) |
+| `VITE_ASSETS_URL` | Build time | CDN URL serving the built assets (`dist/client`), e.g. `https://cdn.example.com/frontend`. Unset: the frontend server serves them |
+| `API_INTERNAL_URL` | Runtime (server) | Django URL used during server-side rendering, e.g. `http://backend:8000`; in development also the target of the Vite dev proxy. Default `http://localhost:8000` |
+| `SITE_URL` | Runtime (server) | Public site URL for canonical links, Open Graph tags and the sitemap |
+| `PORT` | Runtime (server) | Port of the production server (default `3000`) |
 
 ## Requirements
 
@@ -19,7 +46,7 @@ Then open <http://localhost:5173/> in your browser.
 
 Run `uv run bash scripts/prestart.sh` and `uv run python manage.py runserver` from the `backend` directory, with PostgreSQL running in Docker Compose. See [../development.md](../development.md) for the complete setup.
 
-To serve the frontend with Django, run `bun run build` from the `frontend` directory and open `http://localhost:8000`.
+To run the production build, run `bun run build` and `bun run start` from the `frontend` directory and open <http://localhost:3000>.
 
 Check `frontend/package.json` to see the other available commands.
 
@@ -29,11 +56,7 @@ If you are developing an API-only app and want to remove the frontend, you can d
 
 * Remove the `./frontend` directory.
 
-* In the `backend/app/urls.py` file, remove the `spa_index` catch-all route.
-
-* In the `backend/Dockerfile` file, remove the frontend build stage and the `COPY --from=frontend-build` instruction.
-
-* In the `compose.override.yml` file, remove the `playwright` service.
+* In the `compose.yml` and `compose.deploy.yml` files, remove the `frontend` service, and in `compose.override.yml`, remove the `frontend` and `playwright` services.
 
 * Remove the `.github/workflows/playwright.yml` and `.github/workflows/check-client.yml` workflows.
 
@@ -69,13 +92,13 @@ Regenerate the client whenever backend changes affect the OpenAPI schema.
 
 ## Using a Remote API
 
-By default, the built frontend uses the same origin as the Django app. If you want to use a remote API while running the Vite development server, you can set the environment variable `VITE_API_URL` to the URL of the remote API. For example, you can set it in the `frontend/.env` file:
+By default, the browser calls the API on its own origin (`/api`). To run the Vite development server against another backend, point the dev proxy at it in `frontend/.env`:
 
 ```env
-VITE_API_URL=https://my-domain.example.com
+API_INTERNAL_URL=https://my-domain.example.com
 ```
 
-Then, when you run the frontend, it will use that URL as the base URL for the API.
+To build a frontend that calls an API on a different domain (CORS then applies), set `VITE_API_URL` at build time.
 
 ## Code Structure
 

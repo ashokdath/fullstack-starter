@@ -28,6 +28,15 @@ jobs:
       EMAILS_FROM_EMAIL: ${{ vars.EMAILS_FROM_EMAIL }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+      AWS_STORAGE_BUCKET_NAME: ${{ vars.AWS_STORAGE_BUCKET_NAME }}
+      AWS_S3_REGION_NAME: ${{ vars.AWS_S3_REGION_NAME }}
+      AWS_S3_ENDPOINT_URL: ${{ vars.AWS_S3_ENDPOINT_URL }}
+      AWS_S3_CUSTOM_DOMAIN: ${{ vars.AWS_S3_CUSTOM_DOMAIN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      ASSETS_URL: ${{ vars.ASSETS_URL }}
+      # Port on 127.0.0.1 the server's nginx proxies to (unique per project)
+      APP_PORT: ${{ vars.APP_PORT }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -35,6 +44,28 @@ jobs:
           persist-credentials: false
       - name: Build
         run: docker compose -f compose.yml -f compose.deploy.yml build
+      # The built frontend references its assets at ASSETS_URL, so upload them
+      # before the new version starts. Hashed files are cached forever.
+      - name: Upload frontend assets to object storage
+        if: ${{ env.ASSETS_URL != '' }}
+        run: |
+          rm -rf frontend-assets
+          # Copy from the image just built (named after the Compose project)
+          image=$(docker compose -f compose.yml -f compose.deploy.yml config --images frontend | grep -- '-frontend$')
+          container=$(docker create "$image")
+          docker cp "$container:/app/frontend/dist/client" frontend-assets
+          docker rm "$container"
+          aws() {
+            docker run --rm -v "$PWD/frontend-assets:/assets:ro" \
+              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+              -e AWS_DEFAULT_REGION="${AWS_S3_REGION_NAME:-us-east-1}" \
+              amazon/aws-cli ${AWS_S3_ENDPOINT_URL:+--endpoint-url "$AWS_S3_ENDPOINT_URL"} "$@"
+          }
+          aws s3 sync /assets "s3://$AWS_STORAGE_BUCKET_NAME/frontend" \
+            --exclude "assets/images/*" \
+            --cache-control "public, max-age=31536000, immutable"
+          aws s3 sync /assets/assets/images "s3://$AWS_STORAGE_BUCKET_NAME/frontend/assets/images" \
+            --cache-control "public, max-age=3600"
       - name: Prepare database
         run: docker compose -f compose.yml -f compose.deploy.yml run --rm backend bash scripts/prestart.sh
       - name: Start application

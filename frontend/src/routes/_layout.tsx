@@ -10,6 +10,8 @@ import {
 import { isLoggedIn } from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout")({
+  // Reads the token from localStorage: the whole app renders in the browser only
+  ssr: false,
   component: Layout,
   beforeLoad: async () => {
     if (!isLoggedIn()) {

@@ -21,9 +21,11 @@ APP_DIR = Path(__file__).resolve().parent
 
 SECRET_KEY = settings.SECRET_KEY
 DEBUG = settings.is_development
-ALLOWED_HOSTS = ["*"]  # Traefik routes by Host header in front of the app
+ALLOWED_HOSTS = ["*"]  # nginx routes by server_name in front of the app
 
 INSTALLED_APPS = [
+    # Unfold must come before django.contrib.admin to override its templates
+    "unfold",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -38,7 +40,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -105,22 +106,66 @@ USE_TZ = True
 # original FastAPI template), so never redirect to add a slash.
 APPEND_SLASH = False
 
-# Static files: Django admin assets are collected into STATIC_ROOT, the React
-# build (Vite output) is served from the site root by WhiteNoise.
+# Static and media files: Django never serves them in deployments. With object
+# storage configured they live in the bucket (behind a CDN via
+# AWS_S3_CUSTOM_DOMAIN); `collectstatic` uploads the admin assets there.
+# Without it they stay on the local disk, which `runserver` serves in DEBUG.
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-FRONTEND_DIR = APP_DIR / "frontend"
-WHITENOISE_ROOT = FRONTEND_DIR if FRONTEND_DIR.is_dir() else None
-WHITENOISE_INDEX_FILE = False
-STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
-    },
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+if settings.object_storage_enabled:
+    _s3_options = {
+        "bucket_name": settings.AWS_STORAGE_BUCKET_NAME,
+        "access_key": settings.AWS_ACCESS_KEY_ID,
+        "secret_key": settings.AWS_SECRET_ACCESS_KEY,
+        "region_name": settings.AWS_S3_REGION_NAME,
+        "endpoint_url": settings.AWS_S3_ENDPOINT_URL,
+        "custom_domain": settings.AWS_S3_CUSTOM_DOMAIN,
+    }
+    STORAGES = {
+        # User uploads: private by default, URLs are signed unless served
+        # through AWS_S3_CUSTOM_DOMAIN
+        "default": {
+            "BACKEND": "storages.backends.s3.S3Storage",
+            "OPTIONS": {**_s3_options, "location": "media", "file_overwrite": False},
+        },
+        # Admin assets: public, plain URLs so the CDN can cache them
+        "staticfiles": {
+            "BACKEND": "storages.backends.s3.S3Storage",
+            "OPTIONS": {
+                **_s3_options,
+                "location": "static",
+                "querystring_auth": False,
+            },
+        },
+    }
+else:
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+
+# Admin theme (django-unfold): https://unfoldadmin.com/docs/configuration/settings/
+
+UNFOLD = {
+    "SITE_TITLE": settings.PROJECT_NAME,
+    "SITE_HEADER": settings.PROJECT_NAME,
 }
 
-# CORS: only needed when the frontend runs on its own dev server
+# Behind the reverse proxy (TLS terminated there): trust its X-Forwarded-Proto,
+# so request.is_secure() and the admin's CSRF origin check see https. The proxy
+# must always set this header (nginx/host-site.conf.template does, and the
+# project gateway nginx/gateway.conf passes it on).
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+CSRF_TRUSTED_ORIGINS = [settings.FRONTEND_HOST]
+
+# CORS: only needed when the frontend runs on another origin than the API.
+# On the single-domain setup (proxy routes /api to Django) it is unused.
 
 CORS_ALLOWED_ORIGINS = [settings.FRONTEND_HOST]
 CORS_ALLOW_CREDENTIALS = True

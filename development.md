@@ -4,6 +4,8 @@
 
 For local development, run PostgreSQL and Mailpit with Docker Compose, and run the Django and Vite development servers locally.
 
+The project is two apps: Django serves only the API and the admin, and the frontend (TanStack Start) server-renders the public pages and serves the React app. The Vite development server also does server-side rendering, so what you see locally is what crawlers get in production.
+
 Start the supporting services:
 
 ```bash
@@ -32,31 +34,38 @@ bun run dev
 
 Now you can open these URLs:
 
-Frontend development server: <http://localhost:5173>
+Frontend development server (landing page, server-rendered): <http://localhost:5173>
+
+App dashboard (rendered in the browser): <http://localhost:5173/dashboard>
 
 Backend API: <http://localhost:8000>
 
 Automatic interactive API documentation with Swagger UI: <http://localhost:8000/api/v1/docs>
 
-Django admin: <http://localhost:8000/admin>
+Django admin: <http://localhost:8000/django-admin> (also through the frontend at <http://localhost:5173/django-admin>)
 
 Mailpit: <http://localhost:8025>
 
-The frontend development server uses the backend at `http://localhost:8000`, as configured in `frontend/.env`.
+The Vite development server proxies `/api` and `/django-admin` to the backend at `http://localhost:8000` (`API_INTERNAL_URL` in `frontend/.env`), so the browser uses a single origin, like in production.
 
-### Frontend Served by Django
+### Production Frontend Build
 
-Build the frontend from the `frontend` directory:
+Build and run the frontend server from the `frontend` directory:
 
 ```bash
 bun run build
+bun run start
 ```
 
-The build is written to `backend/app/frontend` and served by Django at <http://localhost:8000>. Rebuild the frontend after making frontend changes.
+It listens on <http://localhost:3000>. Set `PORT` to change it, `API_INTERNAL_URL` for the API URL used during server-side rendering, and `SITE_URL` for the absolute URLs in meta tags and the sitemap.
+
+### Object Storage
+
+Without object storage settings, Django keeps static and media files on the local disk and `runserver` serves the static files. To test with a bucket locally, set the `AWS_*` variables in `.env` (see the comments there) and run `uv run python manage.py collectstatic`.
 
 ## Full Stack with Docker Compose
 
-To run the backend and built frontend in Docker Compose:
+To run the backend and the production frontend server in Docker Compose:
 
 ```bash
 docker compose run --rm backend bash scripts/prestart.sh
@@ -65,19 +74,20 @@ docker compose watch
 
 Now you can open these URLs:
 
-Application, with the frontend and API served by Django: <http://localhost:8000>
+Application, through the nginx proxy on a single domain (frontend, `/api` and `/django-admin`): <http://localhost>
+
+Backend API, directly: <http://localhost:8000>
 
 Automatic interactive API documentation with Swagger UI: <http://localhost:8000/api/v1/docs>
 
-Django admin: <http://localhost:8000/admin>
+Django admin: <http://localhost/django-admin>
 
 Adminer, database web administration: <http://localhost:8080>
 
-Traefik UI, to see how the routes are being handled by the proxy: <http://localhost:8090>
-
 Mailpit: <http://localhost:8025>
 
-Stop a locally running Django server before starting the Compose backend because both use port `8000`.
+Stop a locally running Django server before starting the Compose stack because both use port `8000`.
+
 
 **Note**: The first time you start the stack, it might take a minute for all the services to be ready. To monitor it, use `docker compose logs`, or `docker compose logs backend` for the backend service.
 
@@ -89,9 +99,9 @@ Stop a locally running Django server before starting the Compose backend because
 
 The main `compose.yml` file contains the configuration shared by the whole stack. Docker Compose loads it automatically.
 
-The `compose.override.yml` file adds local development settings, such as mounting the source code as a volume. Docker Compose also loads it automatically and applies it on top of `compose.yml`.
+The `compose.override.yml` file adds local development settings, such as mounting the source code as a volume, the gateway (`proxy`, `nginx/gateway.conf`) on port 80, and the local-only services: Adminer, Mailpit and Playwright. Docker Compose also loads it automatically and applies it on top of `compose.yml`.
 
-The `compose.deploy.yml` file contains the deployment-specific settings, including HTTPS and automatic certificate handling. It is explicitly combined with `compose.yml` when deploying the application.
+The `compose.deploy.yml` file contains the deployment-specific settings: restart policies, and the gateway published on `127.0.0.1:APP_PORT` for the server's nginx. It is explicitly combined with `compose.yml` when deploying the application.
 
 The backend reads local settings from the `.env` file. Docker Compose also uses it for variable interpolation and passes the settings each container needs.
 

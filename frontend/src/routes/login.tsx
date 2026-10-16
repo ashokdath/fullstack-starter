@@ -33,11 +33,13 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>
 
 export const Route = createFileRoute("/login")({
+  // Reads the token from localStorage: render in the browser only
+  ssr: false,
   component: Login,
   beforeLoad: async () => {
     if (isLoggedIn()) {
       throw redirect({
-        to: "/",
+        to: "/dashboard",
       })
     }
   },

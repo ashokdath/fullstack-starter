@@ -1,21 +1,3 @@
-FROM oven/bun:1 AS frontend-build
-
-WORKDIR /app
-
-COPY package.json bun.lock /app/
-COPY frontend/package.json /app/frontend/
-
-WORKDIR /app/frontend
-
-RUN bun install
-
-COPY ./frontend /app/frontend
-
-ARG VITE_API_URL=
-
-RUN bun run build
-
-
 FROM python:3.14
 
 ENV PYTHONUNBUFFERED=1
@@ -51,8 +33,6 @@ COPY ./backend/pyproject.toml ./backend/manage.py /app/backend/
 
 COPY ./backend/app /app/backend/app
 
-COPY --from=frontend-build /app/backend/app/frontend /app/backend/app/frontend
-
 # Sync the project
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -61,12 +41,5 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --package app
 
 WORKDIR /app/backend/
-
-# Collect Django admin static files. Settings need values to import, these
-# build-time placeholders are never used at runtime.
-RUN ENVIRONMENT=development SECRET_KEY=build PROJECT_NAME=build \
-    FIRST_SUPERUSER=build@example.com FIRST_SUPERUSER_PASSWORD=build \
-    DATABASE_URL=postgresql://build:build@localhost:5432/build \
-    python manage.py collectstatic --noinput
 
 CMD ["gunicorn", "app.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--access-logfile", "-"]

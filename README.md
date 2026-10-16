@@ -4,7 +4,14 @@
 [![Test Backend](../../actions/workflows/test-backend.yml/badge.svg)](../../actions/workflows/test-backend.yml)
 [![Playwright Tests](../../actions/workflows/playwright.yml/badge.svg)](../../actions/workflows/playwright.yml)
 
-The standard starting point for new projects: a Django + Django Ninja API with a React frontend, ported from the [Full Stack FastAPI Template](https://github.com/fastapi/full-stack-fastapi-template). The frontend is the original one, unchanged: the backend serves the exact same HTTP API, and the generated frontend client is byte-identical.
+The standard starting point for new projects: a Django + Django Ninja API with a server-rendered React frontend, ported from the [Full Stack FastAPI Template](https://github.com/fastapi/full-stack-fastapi-template). The backend serves the exact same HTTP API as the original, and the generated frontend client is byte-identical.
+
+```
+example.com/api/*            → backend: Django Ninja API
+example.com/django-admin/*   → backend: Django admin
+example.com/*                → frontend: TanStack Start (SSR public pages + React app)
+cdn.example.com              → object storage: static files, media uploads, frontend assets
+```
 
 ## Technology Stack and Features
 
@@ -12,16 +19,17 @@ The standard starting point for new projects: a Django + Django Ninja API with a
   - ⚡ [Django Ninja](https://django-ninja.dev) for the typed REST API and OpenAPI schema.
   - 🔍 [Pydantic](https://docs.pydantic.dev) for API schemas and settings management.
   - 💾 [PostgreSQL](https://www.postgresql.org) as the SQL database, with Django migrations.
-  - 🛠️ Django admin at `/admin` for superusers.
+  - 🪣 [django-storages](https://django-storages.readthedocs.io) for static and media files in S3-compatible object storage behind a CDN: Django never serves files.
+  - 🛠️ Django admin at `/django-admin` for superusers, themed with [Unfold](https://unfoldadmin.com). (`/admin` is the React app's user management page.)
 - 🚀 [React](https://react.dev) for the frontend.
-  - 🧩 Built into the backend application and served by Django (WhiteNoise) on the same domain as the API.
+  - 🌐 [TanStack Start](https://tanstack.com/start) server-side rendering for public pages, with per-page SEO meta tags, `robots.txt` and `sitemap.xml`. The logged-in app renders in the browser.
   - 💃 Using TypeScript, hooks, [Vite](https://vitejs.dev), and other parts of a modern frontend stack.
   - 🎨 [Tailwind CSS](https://tailwindcss.com) and [shadcn/ui](https://ui.shadcn.com) for the frontend components.
   - 🤖 An automatically generated frontend client, checked in CI.
   - 🧪 [Playwright](https://playwright.dev) for end-to-end testing.
   - 🦇 Dark mode support.
 - 🐋 [Docker Compose](https://www.docker.com) for local services and self-hosted deployment.
-  - 📞 [Traefik](https://traefik.io) as a reverse proxy with automatic HTTPS.
+  - 📞 [nginx](https://nginx.org): each project runs an nginx gateway on a single port (routes `/api` to Django, everything else to the frontend), behind one shared server nginx for all your projects (HTTPS with certbot).
 - 🔒 Argon2 password hashing, with automatic upgrade of older hashes on login.
 - 🔑 JWT (JSON Web Token) authentication.
 - 📫 Email-based password recovery with single-use links.

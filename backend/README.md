@@ -1,10 +1,10 @@
 # Django Project - Backend
 
-Django 6.1 + [Django Ninja](https://django-ninja.dev) REST API, PostgreSQL, JWT authentication. It also serves the built React frontend and the Django admin.
+Django 6.1 + [Django Ninja](https://django-ninja.dev) REST API, PostgreSQL, JWT authentication. API-only: the frontend is a separate app (`../frontend`), and static and media files are served from object storage.
 
 - API: `/api/v1/` — interactive docs at `/api/v1/docs`, schema at `/api/v1/openapi.json`
-- Django admin: `/admin/` (superusers)
-- Everything else: the React app (`app/frontend/index.html`)
+- Django admin: `/django-admin/` (superusers), themed with [Unfold](https://unfoldadmin.com). Not `/admin/`: on the shared domain that path is the React app's user management page
+- Everything else: 404
 
 ## Contents
 
@@ -49,7 +49,7 @@ $ uv run python manage.py runserver
 | URL | What |
 |---|---|
 | <http://localhost:8000/api/v1/docs> | Interactive API docs (Swagger UI) |
-| <http://localhost:8000/admin/> | Django admin |
+| <http://localhost:8000/django-admin/> | Django admin |
 | <http://localhost:8025> | Mailpit, emails sent in development |
 | <http://localhost:5173> | Frontend dev server, if started with `bun run dev` from the project root |
 
@@ -70,7 +70,7 @@ backend/
 │   └── format.sh               # ruff fix + format
 ├── app/                        # Django project package
 │   ├── settings.py             # Django settings, all values come from core/config.py
-│   ├── urls.py                 # /api/v1/ → Ninja, /admin/, everything else → React app
+│   ├── urls.py                 # /api/v1/ → Ninja, /django-admin/ (everything else: 404)
 │   ├── api.py                  # NinjaAPI instance: routers, auth error handler
 │   ├── schemas.py              # shared schemas: Message, Token, TokenPayload, NewPassword
 │   ├── wsgi.py / asgi.py
@@ -93,8 +93,7 @@ backend/
 │   ├── items/                  # Django app "items": the reference example resource
 │   │   ├── models.py  schemas.py  routes.py  admin.py  migrations/
 │   ├── utils_api/routes.py     # router "utils": health check, test email
-│   ├── email-templates/        # HTML generated from ../packages/react-email (don't edit)
-│   └── frontend/               # Vite build output (git ignored)
+│   └── email-templates/        # HTML generated from ../packages/react-email (don't edit)
 └── tests/
     ├── conftest.py             # fixtures: client, superuser/normal user token headers
     ├── api/routes/             # one test module per router
@@ -117,6 +116,11 @@ All configuration comes from environment variables, validated by the `Settings` 
 | `FIRST_SUPERUSER_PASSWORD` | required | Its password |
 | `ENVIRONMENT` | unset | `development` enables `DEBUG`, the `/api/v1/private` endpoints, and allows placeholder secrets |
 | `FRONTEND_HOST` | `http://localhost:5173` | Used in email links and for CORS |
+| `AWS_STORAGE_BUCKET_NAME` | unset | Enables object storage for static and media files; unset keeps them on the local disk |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | unset | Bucket credentials |
+| `AWS_S3_REGION_NAME` | unset | Bucket region |
+| `AWS_S3_ENDPOINT_URL` | unset | Only for S3-compatible services (R2, MinIO, Spaces, ...) |
+| `AWS_S3_CUSTOM_DOMAIN` | unset | CDN domain in front of the bucket, e.g. `cdn.example.com`; file URLs use it |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `11520` (8 days) | JWT lifetime |
 | `EMAIL_RESET_TOKEN_EXPIRE_HOURS` | `48` | Password reset link lifetime |
 | `SMTP_HOST` | unset | Emails are enabled only when `SMTP_HOST` and `EMAILS_FROM_EMAIL` are set |
@@ -295,7 +299,7 @@ $ uv run bash scripts/prestart.sh
 
 ## Django Admin
 
-Available at `/admin/` for superusers, with session login (separate from the API's JWT). Users and Items are registered (`app/*/admin.py`). Register new models with:
+Available at `/django-admin/` for superusers, with session login (separate from the API's JWT). Users and Items are registered (`app/*/admin.py`). Register new models with:
 
 ```python
 @admin.register(Project)
@@ -382,12 +386,10 @@ The same checks run as pre-commit hooks (`uv run prek install -f` from the root)
 
 `Dockerfile` (built from the project root by Compose):
 
-1. builds the frontend with Bun into `app/frontend`,
-2. installs the Python dependencies with uv,
-3. runs `collectstatic` (Django admin assets),
-4. starts **gunicorn** with 4 workers on port 8000.
+1. installs the Python dependencies with uv,
+2. starts **gunicorn** with 4 workers on port 8000.
 
-In production, WhiteNoise serves both the admin static files (`/static/`) and the React build (site root), so no separate web server is needed behind Traefik.
+Django never serves files in deployments. `scripts/prestart.sh` runs `collectstatic`, which uploads the admin assets to the bucket when `AWS_STORAGE_BUCKET_NAME` is set; uploads (`FileField`, `ImageField`) go to the `media/` prefix of the same bucket. Static URLs are public; media URLs are signed unless `AWS_S3_CUSTOM_DOMAIN` (a CDN) is set.
 
 `compose.override.yml` (applied automatically locally) replaces gunicorn with `manage.py runserver` and syncs `./backend` into the container with `docker compose watch`.
 
@@ -413,7 +415,7 @@ Run from `./backend/` (prefix with `uv run`, or with `docker compose exec backen
 | `python manage.py changepassword <email>` | Reset a user's password |
 | `python manage.py shell` | Django shell |
 | `python manage.py export_openapi_schema --api app.api.api` | Print the OpenAPI schema |
-| `bash scripts/prestart.sh` | Migrate + initial data |
+| `bash scripts/prestart.sh` | Migrate + initial data + collectstatic |
 | `bash scripts/test.sh [pytest args]` | Tests with coverage |
 | `bash scripts/lint.sh` / `format.sh` | Checks / auto-fix |
 
@@ -421,7 +423,8 @@ Run from `./backend/` (prefix with `uv run`, or with `docker compose exec backen
 
 - **`ValueError: The value of SECRET_KEY is "changethis"`** — set real secrets, or `ENVIRONMENT=development` for local work.
 - **`connection ... port 5432 failed: Connection refused`** — PostgreSQL isn't running: `docker compose up -d db`.
-- **`Frontend not built` (404 at `/`)** — the React app isn't built: `bun run build` in `../frontend`, or use the Vite dev server on port 5173.
+- **404 at `/`** — expected: the backend is API-only. Open the frontend (<http://localhost:5173>) or the API docs (`/api/v1/docs`).
+- **Django admin without styles in a deployment** — set the `AWS_*` object storage variables and run `scripts/prestart.sh` (it runs `collectstatic`).
 - **`/api/v1/private/...` returns 404** — those endpoints exist only with `ENVIRONMENT=development`.
 - **Frontend types out of date / Check Frontend Client fails** — run `bash scripts/generate-client.sh` from the root and commit `frontend/src/client`.
 - **CORS errors from the Vite dev server** — `FRONTEND_HOST` must match the dev server origin (`http://localhost:5173`).

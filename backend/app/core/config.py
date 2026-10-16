@@ -46,6 +46,22 @@ class Settings(BaseSettings):
 
     EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48
 
+    # Object storage (S3 or any S3-compatible service: R2, MinIO, Spaces, ...).
+    # When AWS_STORAGE_BUCKET_NAME is set, static and media files are stored in
+    # the bucket and served from it (or from AWS_S3_CUSTOM_DOMAIN, a CDN in
+    # front of it). Without it, files stay on the local disk (development only).
+    AWS_STORAGE_BUCKET_NAME: str | None = None
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
+    AWS_S3_REGION_NAME: str | None = None
+    AWS_S3_ENDPOINT_URL: str | None = None
+    AWS_S3_CUSTOM_DOMAIN: str | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def object_storage_enabled(self) -> bool:
+        return bool(self.AWS_STORAGE_BUCKET_NAME)
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def emails_enabled(self) -> bool:

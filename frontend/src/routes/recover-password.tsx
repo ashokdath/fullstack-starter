@@ -31,11 +31,13 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>
 
 export const Route = createFileRoute("/recover-password")({
+  // Reads the token from localStorage: render in the browser only
+  ssr: false,
   component: RecoverPassword,
   beforeLoad: async () => {
     if (isLoggedIn()) {
       throw redirect({
-        to: "/",
+        to: "/dashboard",
       })
     }
   },

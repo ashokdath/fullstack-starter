@@ -1,0 +1,29 @@
+# Site config for the server's own nginx (shared by all projects on the
+# server). The project's gateway does the routing, so this only forwards the
+# domain to the project's single port. Render and enable it with:
+#
+#   SERVER_NAME=example.com APP_PORT=8000 \
+#   envsubst '$SERVER_NAME $APP_PORT' < nginx/host-site.conf.template \
+#     | sudo tee /etc/nginx/sites-available/example.com
+#   sudo ln -s /etc/nginx/sites-available/example.com /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#   sudo certbot --nginx -d example.com
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${SERVER_NAME};
+
+    client_max_body_size 20m;
+
+    location / {
+        proxy_pass http://127.0.0.1:${APP_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Required, always overwritten here: tells Django the request came
+        # over HTTPS (the admin login fails its CSRF check without it)
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

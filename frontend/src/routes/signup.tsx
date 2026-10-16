@@ -40,11 +40,13 @@ const formSchema = z
 type FormData = z.infer<typeof formSchema>
 
 export const Route = createFileRoute("/signup")({
+  // Reads the token from localStorage: render in the browser only
+  ssr: false,
   component: SignUp,
   beforeLoad: async () => {
     if (isLoggedIn()) {
       throw redirect({
-        to: "/",
+        to: "/dashboard",
       })
     }
   },
