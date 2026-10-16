@@ -1,5 +1,5 @@
 {
-  "name": "django-full-stack-template",
+  "name": "fullstack-starter",
   "private": true,
   "workspaces": [
     "frontend",
