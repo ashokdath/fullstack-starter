@@ -64,22 +64,48 @@ cdn.example.com              → object storage: static files, media uploads, fr
 
 ## Starting a New Project from This Template
 
-1. Click **Use this template** on GitHub (mark this repository as a *Template repository* in its settings first), or copy the repository.
-2. In `.env`, set `PROJECT_NAME` and, for anything other than local development, real values for `SECRET_KEY`, `POSTGRES_PASSWORD` and `FIRST_SUPERUSER_PASSWORD`. Generate them with:
+First mark this repository as a *Template repository* in its GitHub settings, then click **Use this template** to create the new repository (or clone this one). In the new checkout, run the init script:
+
+```bash
+bash scripts/init-project.sh "My Project"
+```
+
+The script:
+
+- renames the project everywhere the template name is hardcoded (`.env`, `package.json`, `frontend/src/lib/site.ts`, `frontend/src/routes/__root.tsx`, the footer, `LICENSE`);
+- generates a local `SECRET_KEY` in `.env` (the other development secrets stay `changethis`, which `ENVIRONMENT=development` allows);
+- writes a short project README and moves this file to `docs/template-README.md`;
+- adds `.DS_Store` to `.gitignore`;
+- removes the `origin` remote if it still points at this template (or runs `git init`), and makes the initial commit;
+- starts PostgreSQL and Mailpit, installs the backend and frontend dependencies, prepares the database and installs the git hooks;
+- deletes itself.
+
+Options: `--slug my-project` (default: derived from the name), `--no-install` (skip Docker, `uv`, `bun` and hooks), `--no-git`, `--keep-script`.
+
+After the script:
+
+1. Replace the logo in `frontend/public/assets/images` and review the footer links in `frontend/src/components/Common/Footer.tsx`.
+2. Keep or remove the **Items** example (see below), then start building.
+3. Push: `git remote add origin <url> && git push -u origin main`.
+4. For deployment, generate real values for `SECRET_KEY`, `POSTGRES_PASSWORD` and `FIRST_SUPERUSER_PASSWORD` and set them, with the other variables listed in [deployment-docker-compose.md](./deployment-docker-compose.md), as GitHub Actions secrets and variables. Never put deployment secrets in `.env`.
 
    ```bash
    python -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
 
-3. Update the page titles (`frontend/src/routes`), `frontend/index.html`, the logo in `frontend/public/assets/images` and the footer.
-4. Keep or remove the **Items** example (see below), then start building.
-5. For deployment, set the GitHub Actions variables and secrets listed in [deployment-docker-compose.md](./deployment-docker-compose.md).
+### Manual Setup
+
+Without the script, do the same by hand: set `PROJECT_NAME` and `SECRET_KEY` in `.env`, rename the project in `package.json`, `frontend/src/lib/site.ts`, `frontend/src/routes/__root.tsx`, `frontend/src/components/Common/Footer.tsx` and `LICENSE`, remove the template remote, then follow [development.md](./development.md) to install and run.
 
 ### The Items Example
 
 `backend/app/items` is the reference implementation of the full pattern: model → migration → Ninja schemas → router → tests → frontend page. Copy it for new resources.
 
-To remove it: delete `backend/app/items`, its entry in `INSTALLED_APPS` (`backend/app/settings.py`) and its router in `backend/app/api.py`, delete `backend/tests/api/routes/test_items.py` and `backend/tests/utils/item.py`, regenerate the client, and remove the Items page and components from the frontend (`frontend/src/routes/_layout/items.tsx`, `frontend/src/components/Items`, the sidebar entry, `frontend/tests/items.spec.ts`).
+To remove it:
+
+- Backend: delete `backend/app/items`, its entry in `INSTALLED_APPS` (`backend/app/settings.py`) and its router in `backend/app/api.py`; delete `backend/tests/api/routes/test_items.py` and `backend/tests/utils/item.py`; drop `/items` from `backend/tests/test_urls.py`.
+- Client: `bash scripts/generate-client.sh`.
+- Frontend: delete `frontend/src/routes/_layout/items.tsx` and `frontend/src/components/Items`, remove the Items entry from `frontend/src/components/Sidebar/AppSidebar.tsx`, delete `frontend/tests/items.spec.ts`. `frontend/src/routeTree.gen.ts` is regenerated on the next `bun run dev` or `bun run build`.
 
 ## API Contract Rules
 
