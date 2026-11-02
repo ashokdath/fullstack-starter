@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router"
 
 import { cn } from "@/lib/utils"
-import icon from "/assets/images/fastapi-icon.svg"
-import iconLight from "/assets/images/fastapi-icon-light.svg"
-import logo from "/assets/images/fastapi-logo.svg"
-import logoLight from "/assets/images/fastapi-logo-light.svg"
+import icon from "/assets/images/icon.svg"
+import iconLight from "/assets/images/icon-light.svg"
+import logo from "/assets/images/logo.svg"
+import logoLight from "/assets/images/logo-light.svg"
 
 interface LogoProps {
   variant?: "full" | "icon" | "responsive"
@@ -26,10 +26,10 @@ function ThemedImage({
 }) {
   return (
     <>
-      <img src={light} alt="FastAPI" className={cn("dark:hidden", className)} />
+      <img src={light} alt="Logo" className={cn("dark:hidden", className)} />
       <img
         src={dark}
-        alt="FastAPI"
+        alt="Logo"
         className={cn("hidden dark:inline", className)}
       />
     </>

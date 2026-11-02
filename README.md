@@ -1,8 +1,8 @@
 # Full Stack Django Template
 
-[![Test Docker Compose](../../actions/workflows/test-docker-compose.yml/badge.svg)](../../actions/workflows/test-docker-compose.yml)
-[![Test Backend](../../actions/workflows/test-backend.yml/badge.svg)](../../actions/workflows/test-backend.yml)
-[![Playwright Tests](../../actions/workflows/playwright.yml/badge.svg)](../../actions/workflows/playwright.yml)
+[![Test Docker Compose](https://github.com/ashokdath/fullstack-starter/actions/workflows/test-docker-compose.yml/badge.svg)](https://github.com/ashokdath/fullstack-starter/actions/workflows/test-docker-compose.yml)
+[![Test Backend](https://github.com/ashokdath/fullstack-starter/actions/workflows/test-backend.yml/badge.svg)](https://github.com/ashokdath/fullstack-starter/actions/workflows/test-backend.yml)
+[![Playwright Tests](https://github.com/ashokdath/fullstack-starter/actions/workflows/playwright.yml/badge.svg)](https://github.com/ashokdath/fullstack-starter/actions/workflows/playwright.yml)
 
 The standard starting point for new projects: a Django + Django Ninja API with a server-rendered React frontend, ported from the [Full Stack FastAPI Template](https://github.com/fastapi/full-stack-fastapi-template). The backend serves the exact same HTTP API as the original, and the generated frontend client is byte-identical.
 
